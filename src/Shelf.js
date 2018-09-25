@@ -9,7 +9,11 @@ export default class Shelf extends Component {
     };
   }
 
-
+  generateBooks =() =>{
+    if(this.props.myBooks.length > 0){
+      return this.props.myBooks.map((book) => (<Book book={book} key={book.id} updateAppState={this.props.updateAppState} />))
+    }
+  }
 
   render() {
     return (
@@ -17,8 +21,7 @@ export default class Shelf extends Component {
         <h2 className="bookshelf-title">{this.props.name}</h2>
         <div className="bookshelf-books">
           <ol className="books-grid">
-            <Book updateState={this.props.updateState} id ={1}/>
-            <Book updateState={this.props.updateState} id ={2}/>
+            {this.generateBooks()}
           </ol>
         </div>
       </div>

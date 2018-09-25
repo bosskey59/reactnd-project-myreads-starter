@@ -2,6 +2,7 @@ import React from 'react'
 import * as BooksAPI from './BooksAPI'
 import './App.css'
 import Shelf from './Shelf'
+import Book from './Book'
 
 class BooksApp extends React.Component {
   state = {
@@ -15,10 +16,12 @@ class BooksApp extends React.Component {
     currentlyReading:[],
     wantToRead:[],
     read:[],
-    books:null
+    books:null,
+    loading:true,
+    searchResults:[]
   }
 
-  updateState =(shelf,book) =>{
+  createLibray =(shelf,book) =>{
     let arrayHolder = null
     if (shelf ==="read"){
       arrayHolder = [...this.state.read, book]
@@ -38,13 +41,73 @@ class BooksApp extends React.Component {
     }
   }
 
+// make code DRY
+
+  updateState = (shelf, book) =>{
+    let arrayHolder = null
+    book.shelf = shelf
+    if(this.state.currentlyReading.includes(book)){
+      arrayHolder = [...this.state.currentlyReading]
+      arrayHolder = arrayHolder.filter(item => item !== book)
+      this.setState({
+        currentlyReading:arrayHolder
+      })
+    }
+    else if(this.state.wantToRead.includes(book)){
+      arrayHolder = [...this.state.wantToRead]
+      arrayHolder = arrayHolder.filter(item => item !== book)
+      this.setState({
+        wantToRead:arrayHolder
+      })
+    }
+    else if(this.state.read.includes(book)){
+      arrayHolder = [...this.state.read]
+      arrayHolder = arrayHolder.filter(item => item !== book)
+      this.setState({
+        read:arrayHolder
+      })
+    }
+    this.createLibray(shelf, book)
+    BooksAPI.update(book, shelf);
+  }
+
   componentDidMount(){
     BooksAPI.getAll().then(books => this.shelfBooks(books))
   }
 
   shelfBooks = (books) =>{
     books.forEach((book) =>{
-      this.updateState(book.shelf, book)
+      this.createLibray(book.shelf, book)
+    })
+    this.setState({
+      loading:false
+    })
+  }
+
+  handleBookSearch =(e) =>{
+    if(e.target.value === ""){
+      this.setState({searchResults:[]})
+    }
+    else{
+      BooksAPI.search(e.target.value).then(books => (this.setState({searchResults:books})))
+    }
+  }
+
+  displaySearchResults = () =>{
+    return this.state.searchResults.map((book) => {
+      const allBooks = [...this.state.currentlyReading, ...this.state.read, ...this.state.wantToRead]
+      let bookInLibrary = allBooks.filter(bookFromLib =>{
+        return bookFromLib.id === book.id
+      })
+      if(bookInLibrary.length >0){
+        return <Book book={bookInLibrary[0]} key={book.id} updateAppState={this.updateState} />
+      }
+      else{
+        let tmpBook = {...book}
+        tmpBook.shelf = "none"
+        return <Book book={tmpBook} key={book.id} updateAppState={this.updateState} />
+      }
+
     })
   }
 
@@ -55,7 +118,7 @@ class BooksApp extends React.Component {
         {this.state.showSearchPage ? (
           <div className="search-books">
             <div className="search-books-bar">
-              <a className="close-search" onClick={() => this.setState({ showSearchPage: false })}>Close</a>
+              <a className="close-search" onClick={() => this.setState({ showSearchPage: false, searchResults:[] })}>Close</a>
               <div className="search-books-input-wrapper">
                 {/*
                   NOTES: The search from BooksAPI is limited to a particular set of search terms.
@@ -64,12 +127,15 @@ class BooksApp extends React.Component {
                   However, remember that the BooksAPI.search method DOES search by title or author. So, don't worry if
                   you don't find a specific author or title. Every search is limited by search terms.
                 */}
-                <input type="text" placeholder="Search by title or author"/>
+                <input type="text" placeholder="Search by title or author" onChange={e => this.handleBookSearch(e)}/>
 
               </div>
             </div>
             <div className="search-books-results">
-              <ol className="books-grid"></ol>
+              <ol className="books-grid">
+                {(this.state.searchResults.length > 0)?(this.displaySearchResults()):null}
+              </ol>
+
             </div>
           </div>
         ) : (
@@ -78,11 +144,14 @@ class BooksApp extends React.Component {
               <h1>MyReads</h1>
             </div>
             <div className="list-books-content">
-              <div>
-                <Shelf name={"Currently Reading"} updateState={this.updateState}/>
-                <Shelf name={"Want to Read"} updateState={this.updateState}/>
-                <Shelf name={"Read"} updateState={this.updateState}/>
-              </div>
+                {this.state.loading ? (<h1>Loading</h1>) :
+                  (<div>
+                    <Shelf name={"Currently Reading"} updateAppState={this.updateState} myBooks={this.state.currentlyReading}/>
+                    <Shelf name={"Want to Read"} updateAppState={this.updateState} myBooks={this.state.wantToRead}/>
+                    <Shelf name={"Read"} updateAppState={this.updateState} myBooks={this.state.read}/>
+                  </div>)
+                }
+
             </div>
             <div className="open-search">
               <a onClick={() => this.setState({ showSearchPage: true })}>Add a book</a>
